@@ -6,7 +6,7 @@ use Exporter;
 use CGI::Request;
 
 @ISA = ('CGI::Request','Exporter');
-$revision='$Id: Form.pm,v 2.72 1995/11/26 04:54:10 lstein Exp $';
+$revision='$Id: Form.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
 ($VERSION=$revision)=~s/.*(\d+\.\d+).*/$1/;
 
 $URL_ENCODED = 'application/x-www-form-urlencoded';

@@ -15,7 +15,7 @@ use sigtrap;				# handy while debugging
 
 use strict qw(refs subs);
 
-$Revision = '$Id: MiniSvr.pm,v 2.72 1995/11/26 04:54:10 lstein Exp $';
+$Revision = '$Id: MiniSvr.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
 ($VERSION = $Revision) =~ s/.*(\d+\.\d+).*/$1/;
 
 my $Debug = 0;

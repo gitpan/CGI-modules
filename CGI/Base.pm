@@ -12,7 +12,7 @@ use URI::Escape;
 
 @ISA = qw(Exporter);
 
-my $Revision = '$Id: Base.pm,v 2.73 1995/12/01 05:39:48 lstein Exp $';
+my $Revision = '$Id: Base.pm,v 2.75 1996/2/15 05:39:48 lstein Exp $';
 my $Debug = 0;
 my $SendHeaders_sent = 0;
 

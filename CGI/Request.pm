@@ -11,7 +11,7 @@ use CGI::BasePlus;
 
 @ISA = qw(Exporter);
 
-$Revision = '$Id: Request.pm,v 2.72 1995/11/26 04:54:10 lstein Exp $';
+$Revision = '$Id: Request.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
 ($VERSION = $Revision) =~ s/.*(\d+\.\d+).*/$1/;
 my $Debug = 0; 	# enable debugging to STDERR (see CGI::Base::LogFile)
 
@@ -134,6 +134,15 @@ Integrates with CGI::MiniSvr.
 =head2 RECENT CHANGES
 
 =over
+
+=item 2.75
+
+Fixed bug in import_names().  Now works properly with both
+scalar and array elements.
+
+=item 2.4 through 2.74
+
+Minor changes to accomodate Forms interface. 
 
 =item 2.1 thru 2.3
 
@@ -622,17 +631,14 @@ sub import_names {
     croak "Can't import_names into '$pkg'\n"
 	    if !$pkg or $pkg eq 'main';
     no strict qw(refs);
-    my($val, $var);
-    foreach ($self->params) {
-	($var, $val) = ($_, $self->param($_));
-	# protect against silly names upsetting perl
-	$var =~ s/[^\w:]/_/g;	# only alphanumerics allowed
-	$var = "${pkg}::$var";
-	$var =~ s/::([^a-zA-Z_])/::_$1/g;
-	print STDERR "import_names setting $var = '@$val' <BR>\n"
-		if $Debug >= 2;
-	@{$var} = @$val;		# all elements into @
-	${$var} = $val->[$#{$val}];	# last element into $
+    my(@value, $var,$param);
+    foreach $param ($self->param) {
+	# protect against silly names
+	$param=~tr/a-zA-Z0-9_/_/c;
+	$var = "${pkg}::$param";
+	@value = $self->param($param);
+	@{$var} = @value;
+	${$var} = $value[$#value];
     }
 }
 

@@ -6,7 +6,7 @@ use URI::Escape  qw(uri_escape uri_unescape);
 use CGI::Carp;
 @ISA = qw(CGI::Base);
 
-$revision='$Id: BasePlus.pm,v 2.72 1995/11/26 04:54:10 lstein Exp $';
+$revision='$Id: BasePlus.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
 ($VERSION=$revision)=~s/.*(\d+\.\d+).*/$1/;
 
 =head1 NAME
