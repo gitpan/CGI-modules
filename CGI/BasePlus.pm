@@ -6,7 +6,7 @@ use URI::Escape  qw(uri_escape uri_unescape);
 use CGI::Carp;
 @ISA = qw(CGI::Base);
 
-$revision='$Id: BasePlus.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
+$revision='$Id: BasePlus.pm,v 2.76 1997/4/5 08:20:00 lstein Exp $';
 ($VERSION=$revision)=~s/.*(\d+\.\d+).*/$1/;
 
 =head1 NAME
@@ -39,16 +39,39 @@ package MultipartBuffer;
 # how many bytes to read at a time.  We use
 # a 5K buffer by default.
 $FILLUNIT = 1024 * 5;		
-$CRLF="\r\n";
+$TIMEOUT = 10*60;       # 10 minute timeout
+$SPIN_LOOP_MAX = 1000;  # bug fix for some Netscape servers
+$CRLF="\015\012";
 
 sub new {
     my($package,$boundary,$length,$filehandle) = @_;
     my $IN;
     if ($filehandle) {
 	my($package) = caller;
-	$IN="$package\:\:$filehandle"; # force into caller's package
+	# force into caller's package if necessary
+	$IN = $filehandle=~/[':]/ ? $filehandle : "$package\:\:$filehandle"; 
     }
     $IN = "main::STDIN" unless $IN;
+    binmode($IN);
+
+    # Netscape seems to be a little bit unreliable
+    # about providing boundary strings.
+    if ($boundary) {
+	# Under the MIME spec, the boundary consists of the 
+	# characters "--" PLUS the Boundary string
+	$boundary = "--$boundary";
+	# Read the topmost (boundary) line plus the CRLF
+	my($null) = '';
+	$length -= read($IN,$null,length($boundary)+2,0);
+    } else { # otherwise we find it ourselves
+	my($old);
+	($old,$/) = ($/,$CRLF); # read a CRLF-delimited line
+	$boundary = <$IN>;      # BUG: This won't work correctly under mod_perl
+	$length -= length($boundary);
+	chomp($boundary);               # remove the CRLF
+	$/ = $old;                      # restore old line separator
+    }
+
     my $self = {LENGTH=>$length,
 		BOUNDARY=>$boundary,
 		IN=>$IN,
@@ -56,12 +79,6 @@ sub new {
 	    };
 
     $FILLUNIT = length($boundary) if length($boundary) > $FILLUNIT;
-    my($null)='';
-
-    # remove the topmost boundary line so that our
-    # first read begins with data.
-    read($IN,$null,length($boundary)+2);
-    $self->{LENGTH}-=(length($boundary)+2);
 
     return bless $self,$package;
 }
@@ -71,11 +88,14 @@ sub new {
 sub readHeader {
     my($self) = @_;
     my($end);
+    my($ok) = 0;
     do {
 	$self->fillBuffer($FILLUNIT);
-    } until
-	(($end = index($self->{BUFFER},"$CRLF$CRLF")) >= 0)
-	    || ($self->{BUFFER} eq '');
+	$ok++ if ($end = index($self->{BUFFER},"${CRLF}${CRLF}")) >= 0;
+	$ok++ if $self->{BUFFER} eq '';
+	$FILLUNIT *= 2 if length($self->{BUFFER}) >= $FILLUNIT; 
+    } until $ok;
+
     my($header) = substr($self->{BUFFER},0,$end+2);
     substr($self->{BUFFER},0,$end+4) = '';
     my %return;
@@ -88,8 +108,9 @@ sub readHeader {
 # This reads and returns the body as a single scalar value.
 sub readBody {
     my($self) = @_;
-    my($data,$returnval);
-    while ($data = $self->read) {
+    my($data);
+    my($returnval)='';
+    while (defined($data = $self->read)) {
 	$returnval .= $data;
     }
     return $returnval;
@@ -100,7 +121,9 @@ sub readBody {
 # skip over the boundary and begin reading again;
 sub read {
     my($self,$bytes) = @_;
-    $bytes = $bytes || $FILLUNIT;	# default number of bytes to read
+
+    # default number of bytes to read
+    $bytes = $bytes || $FILLUNIT;       
 
     # Fill up our internal buffer in such a way that the boundary
     # is never split between reads.
@@ -112,7 +135,6 @@ sub read {
     # If the boundary begins the data, then skip past it
     # and return undef.  The +2 here is a fiendish plot to
     # remove the CR/LF pair at the end of the boundary.
-    # the boundary.
     if ($start == 0) {
 
 	# clear us out completely if we've hit the last boundary.
@@ -128,29 +150,48 @@ sub read {
     }
 
     my $bytesToReturn;    
-    if ($start > 0) {		# read up to the boundary
+    if ($start > 0) {           # read up to the boundary
 	$bytesToReturn = $start > $bytes ? $bytes : $start;
-    } else {			# read the requested number of bytes
-	$bytesToReturn = $bytes;
+    } else {    # read the requested number of bytes
+	# leave enough bytes in the buffer to allow us to read
+	# the boundary.  Thanks to Kevin Hendrick for finding
+	# this one.
+	$bytesToReturn = $bytes - (length($self->{BOUNDARY})+1);
     }
 
     my $returnval=substr($self->{BUFFER},0,$bytesToReturn);
     substr($self->{BUFFER},0,$bytesToReturn)='';
     
-    # If we hit the boundary, then remove the extra CRLF/CRLF from
-    # the end (I think this is a Netscape bug, but who knows?)
-    return ($start > 0) ? substr($returnval,0,-4) : $returnval;
+    # If we hit the boundary, remove the CRLF from the end.
+    return ($start > 0) ? substr($returnval,0,-2) : $returnval;
 }
 
 # This fills up our internal buffer in such a way that the
 # boundary is never split between reads
 sub fillBuffer {
     my($self,$bytes) = @_;
+    return unless $self->{LENGTH};
+
     my($boundaryLength) = length($self->{BOUNDARY});
     my($bufferLength) = length($self->{BUFFER});
     my($bytesToRead) = $bytes - $bufferLength + $boundaryLength + 2;
     $bytesToRead = $self->{LENGTH} if $self->{LENGTH} < $bytesToRead;
+
+    # Try to read some data.  We may hang here if the browser is screwed up.  
     my $bytesRead = read($self->{IN},$self->{BUFFER},$bytesToRead,$bufferLength);
+
+    # An apparent bug in the Netscape Commerce server causes the read()
+    # to return zero bytes repeatedly without blocking if the
+    # remote user aborts during a file transfer.  I don't know how
+    # they manage this, but the workaround is to abort if we get
+    # more than SPIN_LOOP_MAX consecutive zero reads.
+    if ($bytesRead == 0) {
+	die  "CGI::BasePlus: Server closed socket during multipart read (client aborted?).\n"
+	    if ($self->{ZERO_LOOP_COUNTER}++ >= $SPIN_LOOP_MAX);
+    } else {
+	$self->{ZERO_LOOP_COUNTER}=0;
+    }
+
     $self->{LENGTH} -= $bytesRead;
 }
 
@@ -164,22 +205,24 @@ sub eof {
 package TempFile;
 
 @TEMP=('/usr/tmp','/var/tmp','/tmp',);
+unshift(@TEMP,$ENV{TMPDIR}) if defined($ENV{TMPDIR});
 
 foreach (@TEMP) {
     do {$TMPDIRECTORY = $_; last} if -w $_;
 }
 $TMPDIRECTORY  = "." unless $TMPDIRECTORY;
-$SEQUENCE="CGItemp$$0000";
+$SEQUENCE="CGItemp${$}0000";
 
-%OVERLOAD = ('""'=>'as_string');
+# cute feature, but no longer supported
+# %OVERLOAD = ('""'=>'as_string');
 
 # Create a temporary file that will be automatically
 # unlinked when finished.
 sub new {
     my($package) = @_;
     $SEQUENCE++;
-    my $self = "$TMPDIRECTORY/$SEQUENCE";
-    return bless \$self;
+    my $directory = "${TMPDIRECTORY}/${SEQUENCE}";
+    return bless \$directory;
 }
 
 sub DESTROY {
@@ -224,7 +267,7 @@ sub read_multipart {
 	my($key) = $header{'Content-disposition'} ? 'Content-disposition' : 'Content-Disposition';
 	my($param) = $header{$key}=~/ name="(.*?)"/;
 	my($filename) = $header{$key}=~/ filename="(.*?)"/;
-	
+
 	my($value);
 
 	if ($filename) {
@@ -233,8 +276,12 @@ sub read_multipart {
 	    # the file for reading, and stash the filehandle name inside
 	    # the query string.
 	    my($tmpfile) = new TempFile;
-	    open (OUT,">$tmpfile") || croak "CGI open of $tmpfile: $!\n";
-	    chmod 0666,$tmpfile;	# make sure anyone can delete it.
+	    my $tmp = $tmpfile->as_string;
+
+	    open (OUT,">$tmp") || croak "CGI open of $tmpfile: $!\n";
+	    chmod 0666,$tmp;	# make sure anyone can delete it.
+	    binmode(OUT);
+
 	    my $data;
 	    while ($data = $buffer->read) {
 		print OUT $data;
@@ -245,14 +292,18 @@ sub read_multipart {
 	    # The name of this filehandle just happens to be identical
 	    # to the original filename (NOT the name of the temporary
 	    # file, which is hidden!)
-	    my($frame)=1;
-	    my($cp);
-	    do {
-		$cp = caller($frame++);
-	    } until $cp!~/^CGI/;
-	    my($filehandle) = "$cp\:\:$filename";
-	    open($filehandle,$tmpfile) || croak "CGI open of $tmpfile: $!\n";
-	    
+	    my($filehandle);
+	    if ($filename=~/^[a-zA-Z_]/) {
+		my($frame,$cp) = (1);
+		do { $cp = caller($frame++); } until $cp!~/^CGI/;
+		$filehandle = "$cp\:\:$filename";
+	    } else {
+		$filehandle = "\:\:$filename";
+	    }
+	    warn "Filehandle = $filehandle tmpfile = $tmp";
+
+	    open($filehandle,$tmp) || croak "CGI open of $tmpfile: $!\n";
+	    binmode($filehandle);
 	    $value = $filename;
 
 	    # Under Unix, it is safe to let the temporary file be deleted

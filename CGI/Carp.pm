@@ -43,7 +43,7 @@ By default, error messages are sent to STDERR.  Most HTTPD servers
 direct STDERR to the server's error log.  Some applications may wish
 to keep private error logs, distinct from the server's error log, or
 they may wish to direct error messages to STDOUT so that the browser
-will receive them (for debugging, not for public consumption).
+will receive them.
 
 The C<carpout()> function is provided for this purpose.  Since
 carpout() is not exported by default, you must import it explicitly by
@@ -64,17 +64,6 @@ compiler errors will be caught.  Example:
    }
 
 carpout() does not handle file locking on the log for you at this point.
-
-If you want to send errors to the browser, give carpout() a reference
-to STDOUT:
-
-   BEGIN {
-     use CGI::Carp qw(carpout);
-     carpout(STDOUT);
-   }
-
-If you do this, be sure to send a Content-Type header immediately --
-perhaps even within the BEGIN block -- to prevent server errors.
 
 The real STDERR is not closed -- it is moved to SAVEERR.  Some
 servers, when dealing with CGI scripts, close their connection to the
@@ -103,13 +92,33 @@ for debugging purposes or for moderate-use applications.  A future
 version of this module may delay redirecting STDERR until one of the
 CGI::Carp methods is called to prevent the performance hit.
 
+=head1 MAKING PERL ERRORS APPEAR IN THE BROWSER WINDOW
+
+If you want to send fatal (die, confess) errors to the browser, ask to 
+import the special "fatalsToBrowser" subroutine:
+
+    use CGI::Carp qw(fatalsToBrowser);
+    die "Bad error here";
+
+Fatal errors will now be echoed to the browser as well as to the log.  CGI::Carp
+arranges to send a minimal HTTP header to the browser so that even errors that
+occur in the early compile phase will be seen.
+Nonfatal errors will still be directed to the log file only (unless redirected
+with carpout).
+
+=head1 CHANGE LOG
+
+1.05 carpout() added and minor corrections by Marc Hedlund
+     <hedlund@best.com> on 11/26/95.
+
+1.06 fatalsToBrowser() no longer aborts for fatal errors within
+     eval() statements.
+
 =head1 AUTHORS
 
 Lincoln D. Stein <lstein@genome.wi.mit.edu>.  Feel free to redistribute
 this under the Perl Artistic License.
 
-carpout() added and minor corrections by Marc Hedlund
-<hedlund@best.com> on 11/26/95.
 
 =head1 SEE ALSO
 
@@ -124,11 +133,23 @@ use Carp;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(confess croak carp);
-@EXPORT_OK = qw(carpout);
+@EXPORT_OK = qw(carpout fatalsToBrowser);
 
-$main::SIG{__WARN__}='CGI::Carp::warn';
-$main::SIG{__DIE__}='CGI::Carp::die';
-$CGI::Carp::VERSION = '1.02';
+$main::SIG{__WARN__}=\&CGI::Carp::warn;
+$main::SIG{__DIE__}=\&CGI::Carp::die;
+$CGI::Carp::VERSION = '1.06';
+
+# fancy import routine detects and handles 'errorWrap' specially.
+sub import {
+    my $pkg = shift;
+    my(%routines);
+    grep($routines{$_}++,@_);
+    $WRAP++ if $routines{'fatalsToBrowser'};
+    my($oldlevel) = $Exporter::ExportLevel;
+    $Exporter::ExportLevel = 1;
+    Exporter::import($pkg,keys %routines);
+    $Exporter::ExportLevel = $oldlevel;
+}
 
 # These are the originals
 sub realwarn { warn(@_); }
@@ -166,15 +187,25 @@ sub die {
     my $message = shift;
     my $time = scalar(localtime);
     my($file,$line,$id) = id(1);
+    return undef if $file=~/^\(eval/;
     $message .= " at $file line $line.\n" unless $message=~/\n$/;
+    &fatalsToBrowser($message) if $WRAP;
     my $stamp = stamp;
     $message=~s/^/$stamp/gm;
     realdie $message;
 }
 
-sub confess { CGI::Carp::die Carp::longmess @_; }
-sub croak { CGI::Carp::die Carp::shortmess @_; }
-sub carp { CGI::Carp::warn Carp::shortmess @_; }
+# Avoid generating "subroutine redefined" warnings with the following
+# hack:
+{
+    local $^W=0;
+    eval <<EOF;
+sub confess { CGI::Carp::die Carp::longmess \@_; }
+sub croak { CGI::Carp::die Carp::shortmess \@_; }
+sub carp { CGI::Carp::warn Carp::shortmess \@_; }
+EOF
+    ;
+}
 
 # We have to be ready to accept a filehandle as a reference
 # or a string.
@@ -192,6 +223,20 @@ sub carpout {
     open(SAVEERR, ">&STDERR");
     open(STDERR, ">&$no") or 
 	( print SAVEERR "Unable to redirect STDERR: $!\n" and exit(1) );
+}
+
+# headers
+sub fatalsToBrowser {
+    my($msg) = @_;
+    $msg=~s/>/&gt;/g;
+    $msg=~s/</&lt;/g;
+    print STDOUT "Content-type: text/html\n\n";
+    print STDOUT <<END;
+<H1>Software error:</H1>
+<CODE>$msg</CODE>
+<P>
+Please send mail to this site's webmaster for help.
+END
 }
 
 1;

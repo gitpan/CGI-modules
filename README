@@ -39,12 +39,17 @@ the doc/ subdirectory.
 Online documentation of these modules as well as related modules (such
 as the earlier CGI.pm module)  can be found at:
 
-	http://www-genome.wi.mit.edu/ftp/pub/software/WWW/CGIperl/
+	http://www.genome.wi.mit.edu/ftp/pub/software/WWW/CGIperl/
 
 Many examples of CGI scripts of various degrees of complexity can be
 found at:
 
-	http://www-genome.wi.mit.edu/WWW/examples/Ch9/
+	http://www.genome.wi.mit.edu/WWW/examples/Ch9/
+
+NEW IN VERSION 2.76, April 5, 1997:
+
+- Fixes for perl5.004.
+- File upload more reliable.
 
 Lincoln D. Stein
 lstein@genome.wi.mit.edu

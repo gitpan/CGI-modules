@@ -1267,8 +1267,9 @@ sub filefield {
 
     my($name,$default,$size,$maxlength,@other) = 
 	$self->rearrange([NAME,DEFAULT,SIZE,MAXLENGTH],@p);
+    my($current);
 
-    my($current,$default) = ('','');
+    ($current,$default) = ('','');
     $current = defined($self->param($name)) ? $self->param($name) : $default;
     $name = $self->escapeHTML($name);
     my($s) = defined($size) ? qq/SIZE=$size/ : '';
@@ -1489,8 +1490,6 @@ sub checkbox_group {
 #   A string containing a series of <INPUT TYPE="radio"> fields
 ####
 sub radio_group {
-    my($self,@p) = @_;
-
     my($self,@p) = @_;
 
     my($name,$values,$default,$linebreak,$labels,$rows,$columns,$rowheaders,$colheaders,@other) =

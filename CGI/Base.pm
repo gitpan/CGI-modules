@@ -12,7 +12,7 @@ use URI::Escape;
 
 @ISA = qw(Exporter);
 
-my $Revision = '$Id: Base.pm,v 2.75 1996/2/15 05:39:48 lstein Exp $';
+my $Revision = '$Id: Base.pm,v 2.76 1996/4/5 08:39:48 lstein Exp $';
 my $Debug = 0;
 my $SendHeaders_sent = 0;
 
@@ -23,8 +23,6 @@ CGI::Base - HTTP Daemon Common Gateway Interface (CGI) Base Class
 
 
 =head1 SYNOPSIS
-
-	
 
     use CGI::Base;
 	
@@ -588,7 +586,7 @@ sub get_vars_by_debug {		# Handy debugging modes
     $CGI::Base::SERVER_PORT = 80;
     $CGI::Base::SERVER_PROTOCOL = 'HTTP/1.0';
     $CGI::Base::HTTP_USER_AGENT = $CGI::Base::SERVER_SOFTWARE;
-    my $sn = $0;
+    $sn = $0;
     unless ($sn =~ m:^/:) {
 		require Cwd;
         my $cwd = Cwd::fastcwd();
@@ -598,7 +596,7 @@ sub get_vars_by_debug {		# Handy debugging modes
     $CGI::Base::SCRIPT_NAME   = $sn;
     $CGI::Base::REQUEST_METHOD = 'GET';
 
-    my $qs = '';
+    $qs = '';
     if (@ARGV) {	# Debugging off-line via command line args
 	$qs = "@ARGV";
 	$qs =~ tr/ /&/ if $qs =~ m/=/;
@@ -1033,12 +1031,15 @@ sub log_request {	# Write summary of request to the log
 
 # Return a filehandle which can be used without upsetting strict refs
 # This is a method to make it easy for MiniSvr (etc) to use it.
-my $_newfh_seq = "CGI::Base::_newfh000";
+my $_newfh_seq = "newfh000";
 
 sub _newfh {
     my($self, $fh) = @_;
     no strict 'refs';
-    $fh = ++$_newfh_seq unless $fh;
+    unless ($fh) {
+	$fh = ++$_newfh_seq;
+	$fh = "CGI::Base::_$fh";
+    }
     close($fh) if defined fileno($fh);	# may be being reused
     $fh = $$fh if ref $fh;		# reusing previous ref
     bless \*{$fh}, 'FileHandle';

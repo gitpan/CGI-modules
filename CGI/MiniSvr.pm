@@ -13,7 +13,7 @@ use sigtrap;				# handy while debugging
 @ISA = qw(CGI::Base Exporter);
 @EXPORT = ();
 
-use strict qw(refs subs);
+# use strict qw(refs subs);
 
 $Revision = '$Id: MiniSvr.pm,v 2.75 1996/2/15 04:54:10 lstein Exp $';
 ($VERSION = $Revision) =~ s/.*(\d+\.\d+).*/$1/;
@@ -118,7 +118,7 @@ number.
   print "Hello... <A HREF="$me?INSIDE"> Step Inside ...</A>\r\n";
   $cgi->done(1);          # flush out page, include debugging
   $cgi->spawn and exit 0; # fork, original cgi process exits
-  CGI::Query::Interface($cgi); # default to new interface
+  CGI::Request::Interface($cgi); # default to new interface
 
   while($q = GetQuery() or $cgi->exit){ # await request/timeout
      ...
@@ -369,6 +369,7 @@ sub new {			# should only ever be called once
     $cgi->{'socket'}  = $fh;
 
     bless $cgi, $class;	# re-bless from CGI::Base
+    $cgi;
 }
 
 
