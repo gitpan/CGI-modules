@@ -1,0 +1,82 @@
+	    <!-- \$RCSfile\$\$Revision\$\$Date\$ -->
+	    <!-- \$Log\$ -->
+	    <HTML>
+	    <TITLE>CARP.PM</TITLE>
+<p><hr>
+
+<H1> 
+<A NAME="Carp.pm_name_0">
+NAME</A>
+</H1>
+
+CGI::Carp - CGI routines for writing to HTTP error log
+<p><p><hr>
+
+<H1> 
+<A NAME="Carp.pm_synopsis_0">
+SYNOPSIS</A>
+</H1>
+
+    use CGI::Carp;
+<p>
+<XMP>
+    croak "We're outta here!";
+    confess "It was my fault: $!";
+    carp "It was your fault!";   
+    warn "I'm confused";
+    die  "I'm dying.\n";
+
+</XMP>
+<p><p><hr>
+
+<H1> 
+<A NAME="Carp.pm_description_0">
+DESCRIPTION</A>
+</H1>
+
+CGI scripts have a nasty habit of leaving warning messages in the error
+logs that are neither time stamped nor fully identified.  Tracking down
+the script that caused the error is a pain.  This fixes that.  Replace
+the usual
+<p>
+<XMP>
+    uses Carp;
+
+</XMP>
+<p>with
+<p>
+<XMP>
+    uses CGI::Carp
+
+</XMP>
+<p>And the standard <EM>warn()</EM>, die (), <EM>croak()</EM>, <EM>confess()</EM> and <EM>carp()</EM> calls 
+will automagically
+be replaced with functions that write out nicely time-stamped messages
+to the HTTP server error log.
+For example:
+<p>
+<XMP>
+   [Fri Nov 17 21:40:43 1995] test.pl: I'm confused at test.pl line 3.
+   [Fri Nov 17 21:40:43 1995] test.pl: Got an error message: Permission denied.
+   [Fri Nov 17 21:40:43 1995] test.pl: I'm dying.
+
+</XMP>
+<p><p><hr>
+
+<H1> 
+<A NAME="Carp.pm_author_0">
+AUTHOR</A>
+</H1>
+
+Lincoln D. Stein&lt;lstein<STRONG>@genome</STRONG>.wi.mit.edu&gt;.  Feel free to redistribute
+this under the Perl Artistic License.
+<p><p><hr>
+
+<H1> 
+<A NAME="Carp.pm_see_0">
+SEE ALSO</A>
+</H1>
+
+Carp, CGI::Base, CGI::BasePlus, CGI::REQUEST, CGI::MiniSvr, CGI::Form
+<p>
+</HTML>

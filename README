@@ -1,0 +1,50 @@
+These are the CGI:: modules for perl5, for use in writing CGI scripts.
+In addition to this package, you will also need the URI::Unescape
+class, which is part of the libwww-perl package.  It can be obtained
+at any of the following CPAN archives:
+
+      ftp://ftp.cis.ufl.edu/pub/perl/CPAN/ 
+      ftp://ftp.cs.ruu.nl/pub/PERL/CPAN/ 
+      ftp://ftp.delphi.com/pub/mirrors/packages/perl/CPAN/ 
+      ftp://ftp.funet.fi/pub/languages/perl/CPAN/ 
+      ftp://ftp.is.co.za/programming/perl/CPAN/ 
+      ftp://ftp.pasteur.fr/pub/Perl/CPAN/ 
+      ftp://ftp.sterling.com/programming/languages/perl/ 
+      ftp://janus.sedl.org/pub/mirrors/CPAN/ 
+      ftp://orpheu.ci.uminho.pt/pub/lang/perl/ 
+
+To install these modules, cd to the directory that this README file is
+in and type the following:
+
+	perl Makefile.PL
+	make
+	make install
+
+Documentation for these modules is part of the files themselves using
+the pod (Plain Old Documentation) format, and can be read using the
+pod2man and pod2html programs that come with perl5.001.  To convert
+them into manual page format, type something like the following:
+
+	pod2man Base.pm > Base.man
+
+To convert them into html format, type:
+
+	pod2html *.pm
+
+(pod2html automatically creates a file named *.pm.html)
+
+For your convenience, html-ized documentation is already installed in
+the doc/ subdirectory.
+
+Online documentation of these modules as well as related modules (such
+as the earlier CGI.pm module)  can be found at:
+
+	http://www-genome.wi.mit.edu/ftp/pub/software/WWW/CGIperl/
+
+Many examples of CGI scripts of various degrees of complexity can be
+found at:
+
+	http://www-genome.wi.mit.edu/WWW/examples/Ch9/
+
+Lincoln D. Stein
+lstein@genome.wi.mit.edu

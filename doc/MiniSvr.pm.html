@@ -1,0 +1,346 @@
+	    <!-- \$RCSfile\$\$Revision\$\$Date\$ -->
+	    <!-- \$Log\$ -->
+	    <HTML>
+	    <TITLE>MINISVR.PM</TITLE>
+<p><hr>
+
+<H1> 
+<A NAME="MiniSvr.pm_name_0">
+NAME</A>
+</H1>
+
+CGI::MiniSvr - Adds to CGI::Base the ability for a CGI script to become
+a mini http server.
+<p><p><hr>
+
+<H1> 
+<A NAME="MiniSvr.pm_synopsis_0">
+SYNOPSIS</A>
+</H1>
+
+	
+<p>
+<XMP>
+    use CGI::MiniSvr;
+        
+    $cgi = new CGI::MiniSvr;
+    $cgi = new CGI::MiniSvr $port_or_path;
+    $cgi = new CGI::MiniSvr $port_or_path, $timeout_mins;
+        
+    $cgi->port;               # return MiniSvr port number with leading colon
+    $cgi->spawn;              # fork/detach from httpd
+        
+    $cgi->get;                # get input
+        
+    $cgi->pass_thru($host, $port);
+    $cgi->redirect($url);
+        
+    $cgi->done;               # end 'page' and close connection (high-level)
+    $cgi->close;              # just close connection (low-level)
+
+</XMP>
+<p>See also the CGI::Base methods.
+<p><p><hr>
+
+<H1> 
+<A NAME="MiniSvr.pm_description_0">
+DESCRIPTION</A>
+</H1>
+
+This file implements the CGI::MiniSvr object. This object represents an
+alternative <EM>interface</EM> between the application and an HTTP deamon.
+<p>In a typical CGI scenario the <EM>interface</EM> is just a collection of
+environment variables passed to a process which then generated some
+outout and exits. The CGI::Base class implements this standard
+interface.
+<p>The CGI::MiniSvr class inherits from CGI::Base and extends it to
+implement a 'mini http daemon' which can be spawned (forked) from a CGI
+script in order to maintain state information for a client 'session'.
+<p>This is very useful. It neatly side-steps many of the painful issues
+involved in writing real-world multi-screen applications using the
+standard CGI interface (namely saving and restoring state between
+screens).
+<p>Another use for the MiniSvr is to allow cgi scripts to produce output
+pages with dynamically generated in-line graphics (for example). To do
+this the script would spawn a MiniSvr and refer to its port number in
+the URL's for the embedded images. The MiniSvr would then sit on the
+port, with a relatively short timeout, ready to serve the requests for
+those images.  Once all the images have been served the MiniSvr would
+simply exit.
+<p>Like the CGI::Base module the CGI::MiniSvr module does not do any
+significant data parsing. Higher level query processing (forms etc) is
+performed by the CGI::Request module.
+<p>Note that the implementation of these modules means that you should
+invoke <CODE>new CGI::Base;</CODE> before <CODE>new CGI::MiniSvr;</CODE>. This is the
+natural order anyway and so should not be a problem.
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_warning_0">
+WARNING!</A>
+</H2>
+
+This module is <STRONG>not</STRONG> a good solution to many problems! It is only a good
+solution to some. It should only be used by those who understand why it
+is <STRONG>not</STRONG> a good solution to many problems!
+<p>For those who don't see the pitfalls of the mini server approach,
+consider just this one example:  what happens to your machine if new
+'sessions' start, on average, faster than abandoned ones timeout?
+<p>Security and short-lifespan URL's are some of the other problems.
+<p>If in doubt don't use it! If you do then don't blame me for any of the
+problems you may (will) experience. <STRONG>You have been warned!</STRONG>
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_direct_0">
+DIRECT ACCESS USAGE</A>
+</H2>
+
+In this mode the MiniSvr creates an internet domain socket and returns
+to the client a page with URL's which contain the MiniSvr's own port
+number.
+<p>
+<XMP>
+  $q = GetRequest();      # get initial request
+  $cgi = new CGI::MiniSvr;# were going to switch to CGI::MiniSvr later
+  $port = $cgi->port;     # get our port number (as ':NNNN') for use in URL's
+  $me = "http://$SERVER_NAME$port$SCRIPT_NAME"; # build my url
+  print "Hello... <A HREF="$me?INSIDE"> Step Inside ...</A>\r\n";
+  $cgi->done(1);          # flush out page, include debugging
+  $cgi->spawn and exit 0; # fork, original cgi process exits
+  CGI::Query::Interface($cgi); # default to new interface
+  while($q = GetQuery() or $cgi->exit){ # await request/timeout
+     ...
+  }
+
+</XMP>
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_indirect_0">
+INDIRECT ACCESS USAGE</A>
+</H2>
+
+In this mode the MiniSvr creates a unix domain socket and returns to the
+client a page with a hidden field containing the path to the socket.
+<p>
+<XMP>
+  $q = GetRequest(); # get initial request
+  $path = $q->param('_minisvr_socket_path');
+  if ($path) {
+      # just pass request on to our mini server
+      $q->cgi->pass_thru('', $path) or (...handle timeout...)
+      $q->cgi->done;
+  } else {
+      # launch new mini server
+      $path = "/tmp/cgi.$$";
+      $cgi = new CGI::MiniSvr $path; # unix domain socket
+      # code here mostly same as 'DIRECT ACCESS' above except that
+      # the returned page has an embedded field _minisvr_socket_path
+      # set to $path
+      ...
+  }
+
+</XMP>
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_subclassing_0">
+SUBCLASSING THE MINISVR</A>
+</H2>
+
+In some cases you may wish to have more control over the behaviour of
+the mini-server, such as handling some requests at a low level without
+disturbing the application.  Subclassing the server is generally a good
+approach. Use something like this:
+<p>
+<XMP>
+  #   Define a specialised subclass of the MiniSvr for this application
+  {
+    package CGI::MiniSvr::FOO;
+    use CGI::MiniSvr;
+    @ISA = qw(CGI::MiniSvr);
+    # Default behaviour for everything except GET requests for .(gif|html|jpg)
+    # Note that we must take great care not to: a) try to pass_thru to ourselves
+    # (it would hang), or b) pass_thru to the server a request which it will
+    # try to satisfy by starting another instance of this same script!
+    sub method_GET {
+        my $self = shift;
+        if ($self->{SCRIPT_NAME} =~ m/\.(gif|jpg|html)$/){
+            $self->pass_thru('', $self->{ORIG_SERVER_PORT});
+            $self->done;
+            return 'NEXT';
+        }
+        1;
+    }
+    # ... other overriding methods can be defined here ...
+  }
+
+</XMP>
+<p>Once defined you can use your new customised mini server by changing:
+<p>
+<XMP>
+  $cgi = new CGI::MiniSvr;
+
+</XMP>
+<p>into:
+<p>
+<XMP>
+  $cgi = new CGI::MiniSvr::FOO;
+
+</XMP>
+<p>With the example code above any requests for gif, jpg or html will be
+forwarded to the server which originally invoked this script. The application
+no longer has to deal with them. <EM>Note:</EM> this is just an example usage
+for the mechanism, you would typically generate pages in which any
+embedded images had URL's which refer explicitly to the main httpd.
+<p>With a slight change in the code above you can arrange for the handling
+of the pass-thru to occur in a subprocess. This frees the main process
+to handle other requests. Since the MiniSvr typically only exists for
+one process, forking off a subprocess to handle a request is only
+useful for browsers such as Netscape which make multiple parallel
+requests for inline images.
+<p>
+<XMP>
+    if ($self->{SCRIPT_NAME} =~ m/\.(gif|html|jpg)$/){
+        if ($self->fork == 0) {
+            $self->pass_thru('', $self->{ORIG_SERVER_PORT});
+            $self->exit;
+        }
+        $self->done;
+        return 'NEXT';
+    }
+
+</XMP>
+<p>Note that forking can be expensive. It might not be worth doing for
+small images.
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_features_0">
+FEATURES</A>
+</H2>
+
+Object oriented and sub-classable.
+<p>Transparent low-level peer validation (no application involvement
+but extensible through subclassing).
+<p>Transparent low-level pass_thru/redirecting of URL's the application
+is not interested in  (no application involvement but extensible
+through subclassing).
+<p>Effective timeout mechanism with default and per-call settings.
+<p>Good emulation of standard CGI interface (for code portability).
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_recent_0">
+RECENT CHANGES</A>
+</H2>
+<p>
+<DL>
+<DT><STRONG>
+<EM>2.2 and 2.3</EM>
+</STRONG></DT>
+<DD>
+
+Slightly improved documentation. Added a basic <EM>fork()</EM> method. Fixed
+timeout to throw an exception so it's reliable on systems which restart
+system calls. Socket/stdio/filehandle code improved. Cleaned up
+done/close relationship. Added experimental support for optionally
+handling requests by forking on a case-by-case basis. This is handy for
+serving multiple simultaneous image requests from Netscape for example.
+Added notes about the MiniSvr, mainly from discussions with Jack Shirazi
+Removed old explicit port searching code from <EM>_new_inet_socket()</EM>.
+Improved SIGPIPE handling (see CGI::Base).
+<p></DD>
+<DT><STRONG>
+<EM>2.1</EM>
+</STRONG></DT>
+<DD>
+
+Fixed (worked around) a perl/stdio bug which affected POST handling.
+Changed some uses of map to foreach. Slightly improved debugging.
+Added support for any letter case in HTTP headers. Enhanced test code.
+<p></DD>
+<DT><STRONG>
+<EM>2.0</EM>
+</STRONG></DT>
+<DD>
+
+Added more documentation and examples. The max pending connections
+parameter for <EM>listen()</EM> can now be specified as a parameter to <EM>new()</EM>.
+SIGPIPE now ignored by default. Simplified inet socket code with ideas
+from Jack Shirazi. Improved server Status-Line header handling. Fixed
+<EM>validate_peer()</EM> error handling and <EM>redirect()</EM>.  Simplified <EM>get_vars()</EM>
+by splitting into <EM>get_valid_connection()</EM> and <EM>read_headers()</EM>. Moved
+example <EM>method_GET()</EM> out of MiniSvr and into the test script.
+<p>The module file can be run as a cgi script to execute a demo/test. You
+may need to chmod +x this file and teach your httpd that it can execute
+*.pm files.
+<p></DD>
+<DT><STRONG>
+<EM>1.18</EM>
+</STRONG></DT>
+<DD>
+
+Added note about possible use of MiniSvr to serve dynamically generated
+in-line images. Added optional DoubleFork mechanism to spawn which
+might be helpful for buggy httpd's, off by default.
+<p></DD>
+<DT><STRONG>
+<EM>1.17</EM>
+</STRONG></DT>
+<DD>
+
+Added support for an 'indirect, off-net, access' via a local UNIX
+domain socket in the file system. Now uses strict. ORIG_* values now
+stored within object and not exported as globals (Base CGI vars
+remain unchanged).  See CGI::Base for some more details.
+<p></DD>
+</DL>
+.
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_future_0">
+FUTURE DEVELOPMENTS</A>
+</H2>
+
+Full pod documentation.
+<p>None of this is perfect. All suggestions welcome.
+<p>Test unix domain socket mechanism.
+<p>Issue/problem - the handling of headers. Who outputs them and when? We
+have a sequence of: headers, body, end, read, headers, body, end, read
+etc. The problem is that a random piece of code can't tell if the
+headers have been output yet. A good solution will probably have to
+wait till we have better tools for writing HTML and we get away from
+pages of print statements.
+<p>A method for setting PATH_INFO and PATH_TRANSLATED to meaningful values
+would be handy.
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_author_0">
+AUTHOR, COPYRIGHT and ACKNOWLEDGEMENTS</A>
+</H2>
+
+This code is Copyright (C) Tim Bunce 1995. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+<p>This module includes ideas from Pratap Pereira
+<pereira<STRONG>@ee</STRONG>.eng.ohio-state.edu&gt;, Jack Shirazi&lt;js<STRONG>@biu</STRONG>.icnet.uk&gt; and
+others.
+<p>IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT,
+INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION (INCLUDING, BUT NOT
+LIMITED TO, LOST PROFITS) EVEN IF THE AUTHORS HAVE BEEN ADVISED OF
+THE POSSIBILITY OF SUCH DAMAGE.
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_see_0">
+SEE ALSO</A>
+</H2>
+
+CGI::Base, CGI::Request, URI::URL
+<p>
+<H2> 
+<A NAME="MiniSvr.pm_support_0">
+SUPPORT</A>
+</H2>
+
+Please use comp.infosystems.www.* and comp.lang.perl.misc for support.
+Please do _NOT_ contact the author directly. I'm sorry but I just don't
+have the time.
+<p>
+</HTML>

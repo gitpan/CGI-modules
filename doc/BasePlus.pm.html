@@ -1,0 +1,37 @@
+	    <!-- \$RCSfile\$\$Revision\$\$Date\$ -->
+	    <!-- \$Log\$ -->
+	    <HTML>
+	    <TITLE>BASEPLUS.PM</TITLE>
+<p><hr>
+
+<H1> 
+<A NAME="BasePlus.pm_name_0">
+NAME</A>
+</H1>
+
+CGI::BasePlus - HTTP CGI Base Class with Handling of Multipart Forms
+<p><p><hr>
+
+<H1> 
+<A NAME="BasePlus.pm_description_0">
+DESCRIPTION</A>
+</H1>
+
+This module implements a CGI::BasePlus object that is identical in
+behavior to CGI::Base except that it provides special handling for
+postings of MIME type multipart/form-data (which may get very long).
+In the case of these types of postings, parts that are described
+as being from a file upload are copied into a temporary file in
+/usr/tmp, a filehandle is opened on the temporary files, and the name
+of the filehandle is returned to the caller in the
+<STRONG>$CGI::Base:QUERY_STRING</STRONG> variable.
+<p>Please see <EM>CGI::Base</EM> for more information.
+<p>
+<H2> 
+<A NAME="BasePlus.pm_see_0">
+SEE ALSO</A>
+</H2>
+
+URI::URL, CGI::Request, CGI::MiniSvr, CGI::Base
+<p>
+</HTML>
