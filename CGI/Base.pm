@@ -382,7 +382,7 @@ my %Request_Method_Dispatch = (
     other	=> 'method_other',
 );
 
-use strict qw(vars refs subs);
+# use strict qw(vars refs subs);
 
 
 sub new {	# Constructor, but not much to construct!
@@ -635,7 +635,7 @@ sub get_uri {
     # Convert uri into a real object, provide appropriate base url.
     my $base = "http://$CGI::Base::SERVER_NAME";
     $base .= ':'.$CGI::Base::SERVER_PORT if $CGI::Base::SERVER_PORT;
-    $uri = new URI::URL "$base$uri";
+    $uri = uri_escape("$base$uri");
 
     $self->{URI} = $uri;
     $uri;
@@ -685,13 +685,13 @@ sub as_string {
     }
     my $uri = $self->get_uri || '';
     push(@h, sprintf("URI = %s", html_escape($uri)));
-    if ($uri) {
-	foreach(qw(netloc path query frag)){
-	    my $val = $uri->_elem($_);
-	    $val = (defined $val) ? "'$val'" : 'undefined';
-	    push(@h, sprintf("URI %7s = %s", $_, html_escape($val)));
-	}
-    }
+#    if ($uri) {
+#	foreach(qw(netloc path query frag)){
+#	    my $val = $uri->_elem($_);
+#	    $val = (defined $val) ? "'$val'" : 'undefined';
+#	    push(@h, sprintf("URI %7s = %s", $_, html_escape($val)));
+#	}
+#    }
     push(@h, $self->_as_string_extra); # give subclass a chance
     # XXX also output user id and cwd info ? Security risk ?
     push(@h, "</PRE>");
